@@ -383,3 +383,4 @@ def compute_FLOPs_hook(module, input_, output, dict_to_save, ctx: 'TracingContex
 def add_domain(name_operator: str) -> str:
     from nncf.compression_method_api import DOMAIN_CUSTOM_OPS_NAME
     return DOMAIN_CUSTOM_OPS_NAME + "::" + name_operator
+
