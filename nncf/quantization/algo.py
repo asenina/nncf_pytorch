@@ -491,6 +491,30 @@ class PatternBasedQuantizerSetupGenerator(QuantizerSetupGeneratorBase):
 
         return retval
 
+    def __create_scale_module(self, next_bn):
+        class ScaledWeights(nn.Module):
+            def __init__(self, bn):
+                super().__init__()
+                self.bn = bn
+
+            def forward(self, nncf_conv, x):
+                # W * gamma / sigma
+                if nncf_conv.folding_conv_bn:
+
+                    running_std = torch.sqrt(self.bn.running_var + self.bn.eps)
+                    scale_factor = self.bn.weight / running_std
+                    nncf_conv.scale_factor = scale_factor
+                    weights_shape = [1] * len(nncf_conv.weight.shape)
+                    weights_shape[0] = -1
+                    bias_shape = [1] * len(nncf_conv.weight.shape)
+                    bias_shape[1] = -1
+                    scaled_weights = nncf_conv.weight * scale_factor.reshape(weights_shape)
+                    setattr(nncf_conv, 'weight', scaled_weights)
+
+                return x
+
+        return ScaledWeights(next_bn)
+
     def _make_quantizable_subgraph_pattern(self):
         full_pattern = self._make_default_quantizable_subgraph_pattern()
         if self.quantizable_subgraph_patterns is not None:
@@ -797,6 +821,7 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
                 nncf_logger.warning("Enabling quantization range initialization with default parameters.")
                 num_init_samples = 256
             else:
+<<<<<<< b2b047b41050ab9e626bd1d98aaeb34a33b1e589
                 nncf_logger.warning("Initializer section not specified for quantization algorithm in NNCF config and "
                                     "quantization init args not supplied - quantizer range initialization will not be "
                                     "done")
@@ -902,6 +927,26 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
 
         if self._debug_interface is not None:
             target_model.debug_interface.add_interface(self._debug_interface)
+            '''assert len(
+                    qconfig_list) == 1, "Non-HW config scenarios should produce single quantizer configs for each " \
+                                        "weight module!"
+                qconfig = qconfig_list[0]
+
+            quantizer_id = WeightQuantizerId(module_scope)
+            self._hw_precision_constraints.add(quantizer_id, qconfig_list)
+            qconfig.input_shape = module.weight.shape
+            quantizer = self.__create_quantize_module(qconfig)
+            if module in target_model.pair_conv_bn:
+                op_scale = self.__create_scale_module(target_model.pair_conv_bn[module])
+                module.register_pre_forward_operation(op_scale)
+                #op = UpdateWeight(op_scale).to(device)
+
+            op = UpdateWeight(quantizer).to(device)
+            # TODO: separate insertion point semantic for weights and activations
+            insertion_commands.append(InsertionCommand(InsertionPoint(
+                InputAgnosticOperationExecutionContext('', module_scope, 0),
+                InsertionType.NNCF_MODULE_PRE_OP), op, OperationPriority.QUANTIZATION_PRIORITY))
+            self._weight_quantizers[quantizer_id] = quantizer'''
         return insertion_commands
 
     @staticmethod
@@ -1250,7 +1295,8 @@ class QuantizationController(QuantizationControllerBase):
                  groups_of_adjacent_quantizers: GroupsOfAdjacentQuantizers,
                  collect_compression_metrics: bool = True,
                  build_time_metric_info: NetworkQuantizationShareMetricBuildTimeInfo = None,
-                 build_time_range_init_params: RangeInitParams = None):
+                 build_time_range_init_params: RangeInitParams = None,
+                 do_fusing_conv_bn: bool = True):
         super().__init__(target_model)
         self.debug_interface = debug_interface
         self.quantization_config = quantization_config
@@ -1290,6 +1336,11 @@ class QuantizationController(QuantizationControllerBase):
             self.update_metric_store(True)
 
         params = quantization_config.get('params', None)
+
+        params['folding_conv_bn_target_epoch'] = quantization_config.get('folding_conv_bn_target_epoch', -1) 
+        params['freeze_bn_stats_target_epoch'] = quantization_config.get('freeze_bn_stats_target_epoch', -1)
+        scheduler_cls = QUANTIZATION_SCHEDULERS.get("base")
+
         self.is_staged_scheduler = bool(params)
 
         if is_main_process() and should_init:
@@ -1300,9 +1351,18 @@ class QuantizationController(QuantizationControllerBase):
             scheduler_cls = QUANTIZATION_SCHEDULERS.get("staged")
             self._scheduler = scheduler_cls(self, params)
 
+
     @property
     def groups_of_adjacent_quantizers(self) -> GroupsOfAdjacentQuantizers:
         return self._groups_of_adjacent_quantizers
+
+    def do_folding_conv_bn(self):
+        for conv in self._model.pair_conv_bn.keys():
+            conv.folding_conv_bn = True
+
+    def freeze_bn_stats(self):
+        for bn in self._model.pair_conv_bn.values():
+            bn.training = False
 
     def prepare_for_export(self):
         for quantizer_id, quantizer in self.all_quantizations.items():

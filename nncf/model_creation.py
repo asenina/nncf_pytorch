@@ -1,4 +1,4 @@
-"""
+
  Copyright (c) 2020 Intel Corporation
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -74,6 +74,8 @@ def create_compressed_model(model: Module, config: NNCFConfig,
     # Compress model that will be deployed for the inference on target device. No need to compress parts of the
     # model that are used on training stage only (e.g. AuxLogits of Inception-v3 model) or unused modules with weights.
     # As a consequence, no need to care about spoiling BN statistics, as there're disabled in eval mode.
+    import torch.nn.intrinsic.qat.modules.conv_fused
+    #model = fusing(model)
     model.eval()
 
     if dump_graphs:
