@@ -363,6 +363,7 @@ def training_mode_switcher(model: torch.nn.Module, is_training: bool = True):
     finally:
         model.train(is_original_mode_training)
 
+<<<<<<< 85a1afff0a9f5d99180e513d1b95a99025d3b067
 <<<<<<< b2b047b41050ab9e626bd1d98aaeb34a33b1e589
 
 def compute_FLOPs_hook(module, input_, output, dict_to_save, ctx: 'TracingContext'):
@@ -385,14 +386,16 @@ def add_domain(name_operator: str) -> str:
     from nncf.compression_method_api import DOMAIN_CUSTOM_OPS_NAME
     return DOMAIN_CUSTOM_OPS_NAME + "::" + name_operator
 
+=======
+from copy import deepcopy
+>>>>>>> Delete extra experimental code.
 
 def get_pair_conv_bn(model):
-    from torch.nn import BatchNorm2d, Conv2d, Identity
+    from torch.nn import BatchNorm2d
 
     from nncf.layers import NNCFConv2d
-    from nncf.utils import Conv2dBN2d, Conv2dBN2d_seq
 
-    def get_names_modules_for_fusing(model, result):
+    def get_modules_for_fusing(model, result):
         from torch.quantization.fuse_modules import fuse_modules, fuse_known_modules
         from nncf.dynamic_graph.transform_graph import is_nncf_module
         prev_module_name = None
@@ -406,12 +409,12 @@ def get_pair_conv_bn(model):
                 if isinstance(module, BatchNorm2d) and isinstance(prev_module, NNCFConv2d):
                     result[prev_module] = module
             elif not is_nncf_module(module):
-                module = get_names_modules_for_fusing(module, result)
+                module = get_modules_for_fusing(module, result)
             prev_module_name = module_name
             prev_module = module
         return module
     res = {}
-    get_names_modules_for_fusing(model, res)
+    get_modules_for_fusing(model, res)
 
     return res
 
