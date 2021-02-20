@@ -41,6 +41,8 @@
     },
     "compression": {
             "algorithm": "quantization",
+            "folding_conv_bn_target_epoch": 0,
+            "freeze_bn_stats_target_epoch" : -1,
             "ignored_scopes": ["ICNet/interpolate_0"]
     }
 }

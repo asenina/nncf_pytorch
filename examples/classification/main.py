@@ -417,7 +417,7 @@ def train_epoch(train_loader, model, criterion, criterion_fn, optimizer, compres
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % config.print_freq == 0:
+        if i % 1 == 0:
             logger.info(
                 '{rank}: '
                 'Epoch: [{0}][{1}/{2}] '
@@ -447,7 +447,7 @@ def train_epoch(train_loader, model, criterion, criterion_fn, optimizer, compres
             for stat_name, stat_value in compression_ctrl.statistics(quickly_collected_only=True).items():
                 if isinstance(stat_value, (int, float)):
                     config.tb.add_scalar('train/statistics/{}'.format(stat_name), stat_value, i + global_step)
-
+        
 
 def validate(val_loader, model, criterion, config):
     batch_time = AverageMeter()

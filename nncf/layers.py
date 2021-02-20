@@ -65,22 +65,21 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
 
     def _conv_forward(self, input, weight):
         if self.folding_conv_bn:
-
-            weights_shape = [1] * len(self.weight.shape)
+            self.scale_factor = self.pre_ops['0'].op.scale_factor[0]
+            #scale_shape = self.pre_ops['2'].op.scale.shape
+            #if isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.Tensor):
+            #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
+            #elif isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.nn.Parameter):
+            #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
+            weights_shape = [1] * len(weight.shape)
             weights_shape[0] = -1
-            bias_shape = [1] * len(self.weight.shape)
+            bias_shape = [1] * len(weight.shape)
             bias_shape[1] = -1
-            #scaled_weight = self.weight_fake_quant(self.weight * scale_factor.reshape(weight_shape))
-            # using zero bias here since the bias for original conv
-            # will be added later
             if self.bias is not None:
-                copy_bias = deepcopy(self.bias.data)
                 zero_bias = torch.zeros_like(self.bias)
-                self.bias.data = zero_bias
-                conv = self._nncf_conv_forward(input, self.weight)
-                self.bias.data = copy_bias
             else:
-                conv = self._nncf_conv_forward(input, self.weight)
+                zero_bias = torch.zeros(self.out_channels, device=weight.device)
+            conv = self._nncf_conv_forward(input, weight, zero_bias)
 
             if self.scale_factor is not None:
                 conv_orig = conv / self.scale_factor.reshape(bias_shape)
@@ -88,17 +87,16 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
                 conv_orig = conv
             if self.bias is not None:
                 conv_orig = conv_orig + self.bias.reshape(bias_shape)
-            #conv = self.bn(conv_orig)
             return conv_orig
         else:
-            return self._nncf_conv_forward(input, weight)
+            return self._nncf_conv_forward(input, weight, self.bias)
 
-    def _nncf_conv_forward(self, input, weight):
+    def _nncf_conv_forward(self, input, weight, bias):
         if self.padding_mode != 'zeros':
             return F.conv2d(F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode),
-                            weight, self.bias, self.stride,
+                            weight, bias, self.stride,
                             _pair(0), self.dilation, self.groups)
-        return F.conv2d(input, weight, self.bias, self.stride,
+        return F.conv2d(input, weight, bias, self.stride,
                         self.padding, self.dilation, self.groups)
 
 

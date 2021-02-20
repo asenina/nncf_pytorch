@@ -307,11 +307,8 @@ class TestModelsGraph:
         check_model_graph(compressed_model, desc.dot_filename, algo)
 
     def test_quantize_network(self, desc: ModelDesc, _case_config):
-        from copy import deepcopy
         model = desc.model_builder()
         config = get_basic_quantization_config(_case_config.quant_type, input_sample_sizes=desc.input_sample_sizes)
-        #fused_model = fusing(deepcopy(model))
-        #fused_model = torch.quantization.fuse_modules(model, ['conv1', 'bn1' ])
         compressed_model, _ = \
             create_compressed_model_and_algo_for_test(model, config, dummy_forward_fn=desc.dummy_forward_fn,
                                                       wrap_inputs_fn=desc.wrap_inputs_fn)

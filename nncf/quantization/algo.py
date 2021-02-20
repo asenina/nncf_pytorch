@@ -491,28 +491,38 @@ class PatternBasedQuantizerSetupGenerator(QuantizerSetupGeneratorBase):
 
         return retval
 
-    def __create_scale_module(self, next_bn):
+
+    def __create_scale_module(self, next_bn, conv):
         class ScaledWeights(nn.Module):
-            def __init__(self, bn):
+            def __init__(self, bn, conv):
                 super().__init__()
                 self.bn = bn
+                #self.nncf_conv = conv
+                self.do_scaling = True
+                self.scale_factor = [1]
 
-            def forward(self, nncf_conv, x):
+            def forward(self, weight):
                 # W * gamma / sigma
-                if nncf_conv.folding_conv_bn:
+                
+                if self.do_scaling:
                     running_std = torch.sqrt(self.bn.running_var + self.bn.eps)
-                    scale_factor = self.bn.weight / running_std
-                    nncf_conv.scale_factor = scale_factor
-                    weights_shape = [1] * len(nncf_conv.weight.shape)
-                    weights_shape[0] = -1
-                    bias_shape = [1] * len(nncf_conv.weight.shape)
+                    self.scale_factor[0] = self.bn.weight / running_std
+                    weights_shape = [1] * len(weight.shape)
+                    weights_shape[1] = -1
+                    bias_shape = [1] * len(weight.shape)
                     bias_shape[1] = -1
-                    scaled_weights = nncf_conv.weight * scale_factor.reshape(weights_shape)
-                    setattr(nncf_conv, 'weight', scaled_weights)
+                    scaled_weight = weight * self.scale_factor[0].reshape(weights_shape)
+                    #scale_shape = self.nncf_conv._module.pre_ops['2'].op.scale.shape
+                    #if isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.Tensor):
+                    #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
+                    #elif isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.nn.Parameter):
+                    #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
+                    return scaled_weight
+                else:
+                    return weight
+                #return weight
 
-                return x
-
-        return ScaledWeights(next_bn)
+        return ScaledWeights(next_bn, conv)
 
     def _make_quantizable_subgraph_pattern(self):
         full_pattern = self._make_default_quantizable_subgraph_pattern()
@@ -936,12 +946,15 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
             qconfig.input_shape = module.weight.shape
             quantizer = self.__create_quantize_module(qconfig)
             if module in target_model.pair_conv_bn:
-                op_scale = self.__create_scale_module(target_model.pair_conv_bn[module])
-                module.register_pre_forward_operation(op_scale)
-                #op = UpdateWeight(op_scale).to(device)
-
+                op_scale = self.__create_scale_module(target_model.pair_conv_bn[module], module)
+                #module.register_pre_forward_operation(op_scale)
+                op1 = UpdateWeight(op_scale).to(device)
+            quantizer.scale_factor = op1.op.scale_factor
             op = UpdateWeight(quantizer).to(device)
             # TODO: separate insertion point semantic for weights and activations
+            insertion_commands.append(InsertionCommand(InsertionPoint(
+                InputAgnosticOperationExecutionContext('', module_scope, 0),
+                InsertionType.NNCF_MODULE_PRE_OP), op1, OperationPriority.QUANTIZATION_PRIORITY))
             insertion_commands.append(InsertionCommand(InsertionPoint(
                 InputAgnosticOperationExecutionContext('', module_scope, 0),
                 InsertionType.NNCF_MODULE_PRE_OP), op, OperationPriority.QUANTIZATION_PRIORITY))
