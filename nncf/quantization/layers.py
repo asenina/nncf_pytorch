@@ -350,9 +350,12 @@ class SymmetricQuantizer(BaseQuantizer):
         self.signed_tensor.fill_(signed)
 
     def quantize(self, x):
-        if self.is_weights:
-            self.scale.data *= self.scale_factor[0].reshape(self.scale_shape)
-        return symmetric_quantize(x, self.levels, self.level_low, self.level_high, self.scale, self.eps)
+        if self.is_weights and hasattr(self, 'scale_factor'):
+            #self.scale.data = self.scale_factor[0].reshape(self.scale_shape)
+            scale = self.scale.data * self.scale_factor[0].reshape(self.scale_shape)
+        else:
+            scale = self.scale
+        return symmetric_quantize(x, self.levels, self.level_low, self.level_high, scale, self.eps)
 
     def get_trainable_params(self) -> Dict[str, torch.Tensor]:
         return {self.SCALE_PARAM_NAME: self.scale.detach()}

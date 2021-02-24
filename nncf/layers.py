@@ -65,13 +65,10 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
 
     def _conv_forward(self, input, weight):
         if self.folding_conv_bn:
-            self.scale_factor = self.pre_ops['0'].op.scale_factor[0]
-            #scale_shape = self.pre_ops['2'].op.scale.shape
-            #if isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.Tensor):
-            #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
-            #elif isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.nn.Parameter):
-            #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
+            self.scale_factor = self.pre_ops['0'].op.scale_factor
             weights_shape = [1] * len(weight.shape)
+            import cv2
+            #cv2.imwrite('input1.jpg', input[0][0].unsqueeze(0).cpu().detach().numpy() * 255)
             weights_shape[0] = -1
             bias_shape = [1] * len(weight.shape)
             bias_shape[1] = -1
@@ -82,7 +79,7 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
             conv = self._nncf_conv_forward(input, weight, zero_bias)
 
             if self.scale_factor is not None:
-                conv_orig = conv / self.scale_factor.reshape(bias_shape)
+                conv_orig = conv / self.scale_factor[0].reshape(bias_shape)
             else:
                 conv_orig = conv
             if self.bias is not None:

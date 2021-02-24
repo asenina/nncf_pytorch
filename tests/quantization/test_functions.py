@@ -213,7 +213,20 @@ class TestParametrized:
 
             ref_value = ReferenceQuantize.forward(ref_input, ref_input_low, ref_input_range, levels)
 
-            test_value = symmetric_quantize(test_input, levels, level_low, level_high, test_scale, EPS)
+            if scale_mode == 'per_channel_scale':
+                scale_factor = torch.ones(test_scale.shape, device=test_scale.device) * 0.5
+
+                test_scaled_input = test_input * scale_factor.reshape([-1, 1, 1, 1])
+                test_scaled_scale = test_scale * scale_factor
+
+                test_value_with_apply_scale_before = symmetric_quantize(test_scaled_input, levels, level_low, level_high, test_scaled_scale, EPS)
+
+                test_value = symmetric_quantize(test_input, levels, level_low, level_high, test_scale, EPS)
+
+                test_value_with_apply_scale_after = test_value * scale_factor.reshape([-1, 1, 1, 1])
+                check_outputs_for_quantization_functions(test_value_with_apply_scale_after,test_value_with_apply_scale_before , is_fp16, rtol=1e-2 if is_fp16 else 1e-3)
+            else:
+                test_value = symmetric_quantize(test_input, levels, level_low, level_high, test_scale, EPS)
 
             check_outputs_for_quantization_functions(test_value, ref_value, is_fp16, rtol=1e-2 if is_fp16 else 1e-3)
 

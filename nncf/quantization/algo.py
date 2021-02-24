@@ -498,25 +498,21 @@ class PatternBasedQuantizerSetupGenerator(QuantizerSetupGeneratorBase):
                 super().__init__()
                 self.bn = bn
                 #self.nncf_conv = conv
-                self.do_scaling = True
-                self.scale_factor = [1]
+                self.do_scaling = False
+                self.scale_factor = [torch.ones([self.bn.num_features], device=self.bn.weight.device)]
+
 
             def forward(self, weight):
-                # W * gamma / sigma
-                
+                # W * gamma / sigma            
                 if self.do_scaling:
+                    #self.bn.training = False
                     running_std = torch.sqrt(self.bn.running_var + self.bn.eps)
                     self.scale_factor[0] = self.bn.weight / running_std
                     weights_shape = [1] * len(weight.shape)
-                    weights_shape[1] = -1
+                    weights_shape[0] = -1
                     bias_shape = [1] * len(weight.shape)
                     bias_shape[1] = -1
                     scaled_weight = weight * self.scale_factor[0].reshape(weights_shape)
-                    #scale_shape = self.nncf_conv._module.pre_ops['2'].op.scale.shape
-                    #if isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.Tensor):
-                    #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
-                    #elif isinstance(self.nncf_conv._module.pre_ops['2'].op.scale, torch.nn.Parameter):
-                    #    self.nncf_conv._module.pre_ops['2'].op.scale.data *= scale_factor.reshape(scale_shape)
                     return scaled_weight
                 else:
                     return weight
@@ -949,12 +945,15 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
                 op_scale = self.__create_scale_module(target_model.pair_conv_bn[module], module)
                 #module.register_pre_forward_operation(op_scale)
                 op1 = UpdateWeight(op_scale).to(device)
-            quantizer.scale_factor = op1.op.scale_factor
-            op = UpdateWeight(quantizer).to(device)
-            # TODO: separate insertion point semantic for weights and activations
-            insertion_commands.append(InsertionCommand(InsertionPoint(
+                quantizer.scale_factor = op1.op.scale_factor
+
+                insertion_commands.append(InsertionCommand(InsertionPoint(
                 InputAgnosticOperationExecutionContext('', module_scope, 0),
                 InsertionType.NNCF_MODULE_PRE_OP), op1, OperationPriority.QUANTIZATION_PRIORITY))
+
+            op = UpdateWeight(quantizer).to(device)
+            # TODO: separate insertion point semantic for weights and activations
+            
             insertion_commands.append(InsertionCommand(InsertionPoint(
                 InputAgnosticOperationExecutionContext('', module_scope, 0),
                 InsertionType.NNCF_MODULE_PRE_OP), op, OperationPriority.QUANTIZATION_PRIORITY))
@@ -1371,6 +1370,7 @@ class QuantizationController(QuantizationControllerBase):
     def do_folding_conv_bn(self):
         for conv in self._model.pair_conv_bn.keys():
             conv.folding_conv_bn = True
+            conv.pre_ops['0'].op.do_scaling = True
 
     def freeze_bn_stats(self):
         for bn in self._model.pair_conv_bn.values():
