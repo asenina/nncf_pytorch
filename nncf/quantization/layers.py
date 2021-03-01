@@ -352,7 +352,7 @@ class SymmetricQuantizer(BaseQuantizer):
     def quantize(self, x):
         if self.is_weights and hasattr(self, 'scale_factor'):
             #self.scale.data = self.scale_factor[0].reshape(self.scale_shape)
-            scale = self.scale.data * self.scale_factor[0].reshape(self.scale_shape)
+            scale = self.scale.data * self.scale_factor[0].reshape(self.scale_shape).to(self.scale.device)
         else:
             scale = self.scale
         return symmetric_quantize(x, self.levels, self.level_low, self.level_high, scale, self.eps)
@@ -494,6 +494,12 @@ class AsymmetricQuantizer(BaseQuantizer):
         return level_low, level_high, levels
 
     def quantize(self, x):
+        if self.is_weights and hasattr(self, 'scale_factor'):
+            input_low = self.input_low.data * self.scale_factor[0].reshape(self.scale_shape).to(self.input_low.device)
+            input_range = self.input_range.data * self.scale_factor[0].reshape(self.scale_shape).to(self.input_range.device)
+        else:
+            input_low = self.input_low
+            input_high = self.input_range
         return asymmetric_quantize(x, self.levels, self.level_low, self.level_high, self.input_low, self.input_range,
                                    self.eps)
 

@@ -67,8 +67,6 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
         if self.folding_conv_bn:
             self.scale_factor = self.pre_ops['0'].op.scale_factor
             weights_shape = [1] * len(weight.shape)
-            import cv2
-            #cv2.imwrite('input1.jpg', input[0][0].unsqueeze(0).cpu().detach().numpy() * 255)
             weights_shape[0] = -1
             bias_shape = [1] * len(weight.shape)
             bias_shape[1] = -1
@@ -79,7 +77,7 @@ class NNCFConv2d(_NNCFModuleMixin, nn.Conv2d):
             conv = self._nncf_conv_forward(input, weight, zero_bias)
 
             if self.scale_factor is not None:
-                conv_orig = conv / self.scale_factor[0].reshape(bias_shape)
+                conv_orig = conv / self.scale_factor[0].reshape(bias_shape).to(conv.device)
             else:
                 conv_orig = conv
             if self.bias is not None:

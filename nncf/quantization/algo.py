@@ -507,7 +507,10 @@ class PatternBasedQuantizerSetupGenerator(QuantizerSetupGeneratorBase):
                 if self.do_scaling:
                     #self.bn.training = False
                     running_std = torch.sqrt(self.bn.running_var + self.bn.eps)
-                    self.scale_factor[0] = self.bn.weight / running_std
+                    tmp = self.bn.weight / running_std
+                    tmp.to(weight.device)
+                    with torch.no_grad():
+                        self.scale_factor[0] = torch.clamp(tmp, min=1e-5, max=torch.max(tmp))
                     weights_shape = [1] * len(weight.shape)
                     weights_shape[0] = -1
                     bias_shape = [1] * len(weight.shape)
