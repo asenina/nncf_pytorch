@@ -12,7 +12,7 @@
     "num_classes": 1000,
     "batch_size": 200,
     "workers": 6,
-    "multiprocessing_distributed": true,
+    "multiprocessing_distributed": false,
     "optimizer": {
         "base_lr": 3.1e-4,
         "schedule_type": "plateau",
@@ -27,6 +27,8 @@
     "compression": {
         "algorithm": "quantization",
         "quantize_inputs": true,
+        "folding_conv_bn_target_epoch": 0,
+        "freeze_bn_stats_target_epoch" : 3,
         "initializer": {
             "precision": {
                 "type": "hawq",

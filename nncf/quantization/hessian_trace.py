@@ -101,7 +101,7 @@ class HessianTraceEstimator:
                  device: str, data_loader: DataLoader,
                  num_data_points: int):
         self._model = model
-        parameters = [p for p in model.parameters() if p.requires_grad]
+        parameters = [p for p in model.parameters() if p.requires_grad and len(p.shape) > 1]
         self._parameter_handler = ParameterHandler(parameters, device)
         self._batch_size = data_loader.batch_size
         data_loader = wrap_dataloader_for_init(data_loader)

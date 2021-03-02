@@ -364,9 +364,6 @@ def training_mode_switcher(model: torch.nn.Module, is_training: bool = True):
     finally:
         model.train(is_original_mode_training)
 
-<<<<<<< 85a1afff0a9f5d99180e513d1b95a99025d3b067
-<<<<<<< b2b047b41050ab9e626bd1d98aaeb34a33b1e589
-
 def compute_FLOPs_hook(module, input_, output, dict_to_save, ctx: 'TracingContext'):
     if isinstance(module, (nn.Conv1d, nn.ConvTranspose1d, nn.Conv2d, nn.ConvTranspose2d, nn.Conv3d,
                            nn.ConvTranspose3d)):
@@ -387,9 +384,7 @@ def add_domain(name_operator: str) -> str:
     from nncf.compression_method_api import DOMAIN_CUSTOM_OPS_NAME
     return DOMAIN_CUSTOM_OPS_NAME + "::" + name_operator
 
-=======
-from copy import deepcopy
->>>>>>> Delete extra experimental code.
+
 
 def get_pair_conv_bn(model):
     from torch.nn import BatchNorm2d

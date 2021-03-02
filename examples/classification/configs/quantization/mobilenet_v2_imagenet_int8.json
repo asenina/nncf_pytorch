@@ -15,6 +15,7 @@
             5
         ]
     },
+    "target_device": "VPU",
     "compression": {
         "algorithm": "quantization",
         "folding_conv_bn_target_epoch": 0,
