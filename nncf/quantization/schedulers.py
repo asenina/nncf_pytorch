@@ -47,6 +47,7 @@ class StagedQuantizationScheduler(CompressionScheduler):
         self.algo = quantization_ctrl
         self.folding_conv_bn_target_epoch = params.get('folding_conv_bn_target_epoch', -1) 
         self.freeze_bn_stats_target_epoch = params.get('freeze_bn_stats_target_epoch', -1)
+        self.do_freeze = self.freeze_bn_stats_target_epoch >= 0
         self.activations_quant_start_epoch = params.get('activations_quant_start_epoch', 1)
         self.weights_quant_start_epoch = params.get('weights_quant_start_epoch', 1)
         self._set_quantization_status()
@@ -57,7 +58,7 @@ class StagedQuantizationScheduler(CompressionScheduler):
 
         if self.current_epoch == self.folding_conv_bn_target_epoch:
             self.algo.do_folding_conv_bn()
-        if self.current_epoch >= self.freeze_bn_stats_target_epoch:
+        if self.current_epoch >= self.freeze_bn_stats_target_epoch and self.do_freeze:
             self.algo.freeze_bn_stats()
 
         if self.current_epoch == self.activations_quant_start_epoch:

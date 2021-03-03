@@ -12,7 +12,7 @@
     "num_classes": 1000,
     "batch_size": 200,
     "workers": 6,
-    "multiprocessing_distributed": true,
+    "multiprocessing_distributed": false,
     "optimizer": {
         "base_lr": 3.1e-4,
         "schedule_type": "plateau",
@@ -36,6 +36,7 @@
                 "bits": [4, 8],
                 "compression_ratio": 1.5
             }
-        }
+        },
+        "export_to_onnx_standard_ops": true
     }
 }

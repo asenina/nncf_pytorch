@@ -1350,15 +1350,14 @@ class QuantizationController(QuantizationControllerBase):
         if is_main_process() and should_init:
             self.run_batchnorm_adaptation(self.quantization_config)
 
-        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
-        if self.is_staged_scheduler:
-            scheduler_cls = QUANTIZATION_SCHEDULERS.get("staged")
-            self._scheduler = scheduler_cls(self, params)
-        
         if do_fusing_conv_bn:
             scheduler_cls = QUANTIZATION_SCHEDULERS.get("base")
             self._scheduler = scheduler_cls(self, params)
 
+        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
+        if self.is_staged_scheduler:
+            scheduler_cls = QUANTIZATION_SCHEDULERS.get("staged")
+            self._scheduler = scheduler_cls(self, params)
 
 
     @property
