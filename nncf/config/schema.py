@@ -406,6 +406,19 @@ STAGED_QUANTIZATION_PARAMS = {
 
 QUANTIZATION_ALGO_NAME_IN_CONFIG = "quantization"
 
+SCHEDULER_QUANTIZATION_PARAMS = {
+    "scheduler_params": {
+        "type": "object",
+        "properties": {
+            "folding_conv_bn_target_epoch": with_attributes(_NUMBER,
+                                            description="Index of the epoch from which blocks like {conv2d->bn2d} will be folding."),
+            "freeze_bn_stats_target_epoch": with_attributes(_NUMBER,
+                                             description="Index of the epoch from which BN statistics wil be freeze."),
+        }
+    }
+}
+
+
 QUANTIZATION_SCHEMA = {
     **BASIC_COMPRESSION_ALGO_SCHEMA,
     "properties": {
@@ -458,13 +471,9 @@ QUANTIZATION_SCHEMA = {
                                                                    "node pairs (8-bit quantization only in the latter "
                                                                    "case). Default: false"),
         **STAGED_QUANTIZATION_PARAMS,
+        **SCHEDULER_QUANTIZATION_PARAMS,
         **COMMON_COMPRESSION_ALGORITHM_PROPERTIES,
-        "folding_conv_bn_target_epoch": with_attributes(_NUMBER,
-                                            description="Index of the epoch from which blocks like {conv2d->bn2d} will be folding."),
-        "freeze_bn_stats_target_epoch": with_attributes(_NUMBER,
-                                             description="Index of the epoch from which BN statistics wil be freeze."), 
     },
-
     "additionalProperties": False
 }
 

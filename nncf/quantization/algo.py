@@ -1300,8 +1300,7 @@ class QuantizationController(QuantizationControllerBase):
                  groups_of_adjacent_quantizers: GroupsOfAdjacentQuantizers,
                  collect_compression_metrics: bool = True,
                  build_time_metric_info: NetworkQuantizationShareMetricBuildTimeInfo = None,
-                 build_time_range_init_params: RangeInitParams = None,
-                 do_fusing_conv_bn: bool = True):
+                 build_time_range_init_params: RangeInitParams = None):
         super().__init__(target_model)
         self.debug_interface = debug_interface
         self.quantization_config = quantization_config
@@ -1344,20 +1343,21 @@ class QuantizationController(QuantizationControllerBase):
 
         self.is_staged_scheduler = bool(params)
 
-        params['folding_conv_bn_target_epoch'] = quantization_config.get('folding_conv_bn_target_epoch', -1) 
-        params['freeze_bn_stats_target_epoch'] = quantization_config.get('freeze_bn_stats_target_epoch', -1)
-
         if is_main_process() and should_init:
             self.run_batchnorm_adaptation(self.quantization_config)
 
-        if do_fusing_conv_bn:
-            scheduler_cls = QUANTIZATION_SCHEDULERS.get("base")
-            self._scheduler = scheduler_cls(self, params)
-
-        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
+        scheduler_params = quantization_config.get('scheduler_params')
         if self.is_staged_scheduler:
+            if scheduler_params is not None:
+                params.update(scheduler_params)
             scheduler_cls = QUANTIZATION_SCHEDULERS.get("staged")
             self._scheduler = scheduler_cls(self, params)
+        elif scheduler_params is not None:
+            scheduler_cls = QUANTIZATION_SCHEDULERS.get("base")
+            self._scheduler = scheduler_cls(self, scheduler_params)
+
+        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
+        
 
 
     @property
