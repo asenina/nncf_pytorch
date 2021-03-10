@@ -81,6 +81,14 @@ def match_keys(is_resume, state_dict_to_load, model_state_dict, key_normalizer):
     num_loaded_layers = 0
     new_dict = {}
 
+    def replace_keys_if_use_bn_folding(key):
+        ind = key.find("pre_ops.0.op")
+        if key.find("activation_quantizers") == -1 and ind != -1:
+            # its weight quantizer
+            return key.replace("pre_ops.0.op", "pre_ops.1.op")
+        return key
+
+
     def check_parameter_size(key, value_to_load, num_loaded_layers):
         size_of_value_to_load = value_to_load.size()
         size = model_state_dict[key].size()
@@ -111,12 +119,7 @@ def match_keys(is_resume, state_dict_to_load, model_state_dict, key_normalizer):
         norm_clipped_keys[normalized_key] = orig_key
 
     unexpected_keys = []
-
-    for (saved_key, saved_value) in state_dict_to_load.items():
-        clipped_saved_key = saved_key
-        for pattern in clip_patterns:
-            clipped_saved_key = clipped_saved_key.replace(pattern, '')
-
+    def match_clipped_saved_key(clipped_saved_key, saved_value, num_loaded_layers):
         if clipped_saved_key in clipped_key_to_model_key_dict:
             key = clipped_key_to_model_key_dict[clipped_saved_key]
             num_loaded_layers = check_parameter_size(key, saved_value, num_loaded_layers)
@@ -126,8 +129,28 @@ def match_keys(is_resume, state_dict_to_load, model_state_dict, key_normalizer):
                 key = norm_clipped_keys[norm_clipped_saved_key]
                 num_loaded_layers = check_parameter_size(key, saved_value, num_loaded_layers)
             else:
-                unexpected_keys.append(saved_key)
-    missing_keys = [k for k in model_state_dict.keys() if k not in new_dict and k not in skipped_keys]
+                return False, num_loaded_layers
+        return True, num_loaded_layers
+
+    for (saved_key, saved_value) in state_dict_to_load.items():
+        replace_saved_key = replace_keys_if_use_bn_folding(saved_key)
+        clipped_saved_key = saved_key
+        replace_clipped_saved_key = replace_saved_key
+        for pattern in clip_patterns:
+            clipped_saved_key = clipped_saved_key.replace(pattern, '')
+            replace_clipped_saved_key = replace_clipped_saved_key.replace(pattern, '')
+
+        matched_replace_clipped_saved_key = True
+        matched_clipped_saved_key, num_loaded_layers = \
+            match_clipped_saved_key(clipped_saved_key, saved_value, num_loaded_layers)
+        if clipped_saved_key != replace_clipped_saved_key:
+            matched_replace_clipped_saved_key, num_loaded_layers = \
+                match_clipped_saved_key(replace_clipped_saved_key, saved_value, num_loaded_layers)
+
+        if not matched_clipped_saved_key  and not matched_replace_clipped_saved_key:
+            unexpected_keys.append(saved_key)
+
+    missing_keys = [k for k in model_state_dict.keys() if k not in new_dict and k not in skipped_keys and not k.find("pre_ops.0.op.bn") != -1]
     problematic_keys = {'Missing': missing_keys,
                         'Unexpected': unexpected_keys,
                         'Skipped': skipped_keys}

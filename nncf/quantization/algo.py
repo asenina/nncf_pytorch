@@ -1064,6 +1064,9 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
 
         non_unified_scales_quantization_point_ids = set(quantizer_setup.quantization_points.keys())
 
+        weight_quantizers = 0
+        act_quantizers = 0
+        scaled_weight_quantizers = 0
         for unified_scales_group in quantizer_setup.unified_scale_groups:
             for us_qp_id in unified_scales_group:
                 non_unified_scales_quantization_point_ids.discard(us_qp_id)
@@ -1098,16 +1101,19 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
                                                                                       [ip, ],
                                                                                       qconfig,
                                                                                       range_init_minmax_values)
+                act_quantizers += 1                                                                      
             elif qp.is_weight_quantization_point():
                 commands = []
                 command_scaled_weight = self._add_single_scaled_weight_op(target_model, ip)
 
                 quantizer_module_id, command = self._add_single_weight_quantizer(target_model, ip, qconfig,
                                                                                  range_init_minmax_values)
+                weight_quantizers += 1
 
                 if command_scaled_weight is not None:
                     command.fn.op.scale_factor = command_scaled_weight.fn.op.scale_factor
                     commands.append(command_scaled_weight)
+                    scaled_weight_quantizers +=1
                 commands.append(command)
 
             qp_id_vs_quant_module_id_dict[qp_id] = quantizer_module_id

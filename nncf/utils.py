@@ -138,7 +138,6 @@ def get_all_modules_by_type(model, module_types=None, current_scope=None,
 def get_state_dict_names_with_modules(model, str_types=None, prefix=''):
     found = OrderedDict()
     for name, module in model.named_children():
-        print(name)
         full_node_name = "{}{}".format(prefix, name)
         if str_types is not None and type(module).__name__ in str_types:
             found[full_node_name] = module
