@@ -29,7 +29,7 @@ import operator
 import shutil
 import torch
 from copy import deepcopy
-
+from torch.nn import Identity
 from nncf.utils import get_scale_shape
 
 from nncf.common.quantization.structs import QuantizerSetupType
@@ -976,7 +976,6 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
             def __init__(self, bn, conv):
                 super().__init__()
                 self.bn = bn
-                #self.nncf_conv = conv
                 self.do_scaling = False
                 self.scale_factor = [torch.ones([self.bn.num_features], device=self.bn.weight.device)]
 
@@ -984,7 +983,6 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
             def forward(self, weight):
                 # W * gamma / sigma            
                 if self.do_scaling:
-                    #self.bn.training = False
                     running_std = torch.sqrt(self.bn.running_var + self.bn.eps)
                     tmp = self.bn.weight / running_std
                     tmp.to(weight.device)
@@ -998,7 +996,6 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
                     return scaled_weight
                 else:
                     return weight
-                #return weight
 
         return ScaledWeights(next_bn, conv)
 
@@ -1383,6 +1380,48 @@ class QuantizationController(QuantizationControllerBase):
         for quantizer_id, quantizer in self.all_quantizations.items():
             if not quantizer.is_enabled_quantization():
                 nncf_logger.warning('Disabled quantization on export to ONNX: {}'.format(quantizer_id))
+
+        # remove ScaledWeights module
+        for conv, bn in self._model.pair_conv_bn.items():
+            scaled_wights_op = conv.remove_pre_forward_operation('0')
+            self._fusing_conv2d_and_bn2d(conv, bn)
+        self._replace_bn_identity()
+
+    def _replace_bn_identity(self):
+        def recursively(model):
+            for module_name in model._modules:
+                if isinstance(model._modules[module_name], torch.nn.BatchNorm2d):
+                    model._modules[module_name] = torch.nn.Identity()
+                if len(model._modules[module_name]._modules) > 0:
+                    recursively(model._modules[module_name])
+
+        recursively(self._model)
+
+
+    def _fusing_conv2d_and_bn2d(self, conv, bn):
+        # update weight and bias convolution
+        # replace BatchNorm -> Indentity
+          w = conv.weight
+          b = conv.bias
+          gamma = bn.weight
+          sigma = torch.sqrt(bn.running_var + bn.eps)
+          mu = bn.running_mean
+          betta = bn.bias
+          scale_factor = gamma / sigma
+          scale_factor = torch.clamp(scale_factor, min=1e-5, max=torch.max(scale_factor).data)
+
+          weights_shape = [1] * len(w.shape)
+          weights_shape[0] = -1
+          w_folded = w * scale_factor.reshape(weights_shape)
+          b_folded = - mu * scale_factor + betta
+          if b is not None:
+              b_folded += b
+
+          conv.weight = torch.nn.Parameter(w_folded)
+          conv.bias = torch.nn.Parameter(b_folded)
+          return conv
+
+
 
     def update_metric_store(self, do_all: bool = False):
         for collector in self.non_stable_metric_collectors:
