@@ -29,7 +29,7 @@ import operator
 import shutil
 import torch
 from copy import deepcopy
-from torch.nn import Identity
+
 from nncf.utils import get_scale_shape
 
 from nncf.common.quantization.structs import QuantizerSetupType
@@ -1061,9 +1061,6 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
 
         non_unified_scales_quantization_point_ids = set(quantizer_setup.quantization_points.keys())
 
-        weight_quantizers = 0
-        act_quantizers = 0
-        scaled_weight_quantizers = 0
         for unified_scales_group in quantizer_setup.unified_scale_groups:
             for us_qp_id in unified_scales_group:
                 non_unified_scales_quantization_point_ids.discard(us_qp_id)
@@ -1097,20 +1094,17 @@ class QuantizationBuilder(PTCompressionAlgorithmBuilder):
                 quantizer_module_id, commands = self._add_single_activation_quantizer(target_model,
                                                                                       [ip, ],
                                                                                       qconfig,
-                                                                                      range_init_minmax_values)
-                act_quantizers += 1                                                                      
+                                                                                      range_init_minmax_values)                                                     
             elif qp.is_weight_quantization_point():
                 commands = []
                 command_scaled_weight = self._add_single_scaled_weight_op(target_model, ip)
 
                 quantizer_module_id, command = self._add_single_weight_quantizer(target_model, ip, qconfig,
                                                                                  range_init_minmax_values)
-                weight_quantizers += 1
 
                 if command_scaled_weight is not None:
                     command.fn.op.scale_factor = command_scaled_weight.fn.op.scale_factor
                     commands.append(command_scaled_weight)
-                    scaled_weight_quantizers +=1
                 commands.append(command)
 
             qp_id_vs_quant_module_id_dict[qp_id] = quantizer_module_id
@@ -1348,6 +1342,8 @@ class QuantizationController(QuantizationControllerBase):
 
         if is_main_process() and should_init:
             self.run_batchnorm_adaptation(self.quantization_config)
+        
+        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
 
         scheduler_params = quantization_config.get('scheduler_params')
         if self.is_staged_scheduler:
@@ -1358,10 +1354,6 @@ class QuantizationController(QuantizationControllerBase):
         elif scheduler_params is not None:
             scheduler_cls = QUANTIZATION_SCHEDULERS.get("base")
             self._scheduler = scheduler_cls(self, scheduler_params)
-
-        # Staged scheduler must be created after initialized to prevent extra logic with disabled quantizations
-        
-
 
     @property
     def groups_of_adjacent_quantizers(self) -> GroupsOfAdjacentQuantizers:
@@ -1400,7 +1392,6 @@ class QuantizationController(QuantizationControllerBase):
 
     def _fusing_conv2d_and_bn2d(self, conv, bn):
         # update weight and bias convolution
-        # replace BatchNorm -> Indentity
           w = conv.weight
           b = conv.bias
           gamma = bn.weight

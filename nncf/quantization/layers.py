@@ -351,7 +351,6 @@ class SymmetricQuantizer(BaseQuantizer):
 
     def quantize(self, x):
         if hasattr(self, 'scale_factor'):
-            #self.scale.data = self.scale_factor[0].reshape(self.scale_shape)
             scale = self.scale.data * self.scale_factor[0].reshape(self.scale_shape).to(self.scale.device)
         else:
             scale = self.scale

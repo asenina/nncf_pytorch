@@ -437,28 +437,6 @@ class NNCFNetwork(nn.Module, PostGraphBuildActing):
             retval = self.get_nncf_wrapped_model()(*args, **kwargs)
         return retval
 
-    #def train(self: mode: bool = True):
-    #    r"""Sets the module in training mode.
-#
-    #    This has any effect only on certain modules. See documentations of
-    #    particular modules for details of their behaviors in training/evaluation
-    #    mode, if they are affected, e.g. :class:`Dropout`, :class:`BatchNorm`,
-    #    etc.
-#
-    #    Args:
-    #        mode (bool): whether to set training mode (``True``) or evaluation
-    #                     mode (``False``). Default: ``True``.
-#
-    #    Returns:
-    #        Module: self
-    #    """
-    #    self.training = mode
-    #    for module in self.children():
-    #        if module in self.pair_conv_bn.values():
-    #            if 
-    #        module.train(mode)
-    #    return self
-
     def register_algorithm(self, builder: 'CompressionAlgorithmBuilder'):
         """Should be called during *builder*'s *apply_to* method, otherwise there will be no corresponding
         controller returned by the network on the *commit_compression_changes* stage"""
